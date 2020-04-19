@@ -846,7 +846,7 @@
 			
 			if( !$this->options['cdn_url'] )
 			{
-				throw new Exception( 'PageCDN-Error: Private CDN could not be enabled as no cdn_url is specified.' );
+				$this->error( 'PageCDN-Error: Private CDN could not be enabled as no cdn_url is specified.' );
 			}
 		}
 		
@@ -1169,8 +1169,6 @@
 			return $tool;
 		}
 		
-		
-		
 		function api_request( $endpoint , $method = 'get' , $fields = array( ) )
 		{
 			if( !isset( $fields['apikey'] ) )
@@ -1248,7 +1246,7 @@
 			{
 				$curl_error		= curl_error( $curl );
 				
-				throw new Exception( "PageCDN-Error: {$curl_error}");
+				$this->error( "PageCDN-Error: {$curl_error}" );
 			}
 			
 			curl_close( $curl );
