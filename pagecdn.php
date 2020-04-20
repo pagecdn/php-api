@@ -13,13 +13,7 @@
 		
 		private $options;
 		
-		//private $cache;
-		
 		private $known_urls;
-		
-		private $known_webp_urls;
-		
-		private $known_img_urls;
 		
 		static function init( $options = array( ) )
 		{
@@ -159,16 +153,6 @@
 					{
 						file_put_contents( $options['cache_dir'] . '/url-cache-' . $options['id'] . '.json' , json_encode( array( ) ) );
 					}
-					
-					if( !file_exists( $options['cache_dir'] . '/url-img-cache-' . $options['id'] . '.json' ) )
-					{
-						file_put_contents( $options['cache_dir'] . '/url-img-cache-' . $options['id'] . '.json' , json_encode( array( ) ) );
-					}
-					
-					if( !file_exists( $options['cache_dir'] . '/url-webp-cache-' . $options['id'] . '.json' ) )
-					{
-						file_put_contents( $options['cache_dir'] . '/url-webp-cache-' . $options['id'] . '.json' , json_encode( array( ) ) );
-					}
 				}
 				
 				$options['origin_host']	= parse_url( $options['origin_url'] , PHP_URL_HOST );
@@ -224,24 +208,6 @@
 				{
 					$this->known_urls	= array( );
 				}
-				
-				if( $this->known_img_urls = file_get_contents( $options['cache_base'] . 'url-img-cache-' . $options['id'] . '.json' ) )
-				{
-					$this->known_img_urls	= json_decode( $this->known_img_urls , true );
-				}
-				else
-				{
-					$this->known_img_urls	= array( );
-				}
-				
-				if( $this->known_webp_urls = file_get_contents( $options['cache_base'] . 'url-webp-cache-' . $options['id'] . '.json' ) )
-				{
-					$this->known_webp_urls	= json_decode( $this->known_webp_urls , true );
-				}
-				else
-				{
-					$this->known_webp_urls	= array( );
-				}
 			}
 			
 			$this->options	= $options;
@@ -269,30 +235,51 @@
 		
 		private function cache_get( $url )
 		{
+			$cache_identifier	= '';
+			
+			if( $this->options['optimize_images'] )
+			{
+				if( $this->options['webp_support'] )
+				{
+					$cache_identifier	= 'webp:';
+					
+					if( isset( $this->known_urls[$cache_identifier.$url] ) )
+					{
+						$this->counter_get( 'cache-webp-url' );
+						
+						return $this->known_urls[$cache_identifier.$url];
+					}
+				}
+				else
+				{
+					$cache_identifier	= 'img:';
+					
+					if( isset( $this->known_urls[$cache_identifier.$url] ) )
+					{
+						$this->counter_get( 'cache-img-url' );
+						
+						return $this->known_urls[$cache_identifier.$url];
+					}
+				}
+			}
+			
+			if( $this->options['minify_css'] || $this->options['minify_js'] )
+			{
+				$cache_identifier	= 'min:';
+				
+				if( isset( $this->known_urls[$cache_identifier.$url] ) )
+				{
+					$this->counter_get( 'cache-url' );
+					
+					return $this->known_urls[$cache_identifier.$url];
+				}
+			}
+			
 			if( isset( $this->known_urls[$url] ) )
 			{
 				$this->counter_get( 'cache-url' );
 				
 				return $this->known_urls[$url];
-			}
-			
-			if( $this->options['webp_support'] )
-			{
-				if( isset( $this->known_webp_urls[$url] ) )
-				{
-					$this->counter_get( 'cache-webp-url' );
-					
-					return $this->known_webp_urls[$url];
-				}
-			}
-			else
-			{
-				if( isset( $this->known_img_urls[$url] ) )
-				{
-					$this->counter_get( 'cache-img-url' );
-					
-					return $this->known_img_urls[$url];
-				}
 			}
 			
 			return false;
@@ -313,33 +300,6 @@
 			return $optimized;
 		}
 		
-		private function cache_set_image( $original , $optimized )
-		{
-			if( $this->options['cache_dir'] )
-			{
-				if( $this->options['webp_support'] )
-				{
-					$this->known_webp_urls[$original] = $optimized;
-					
-					file_put_contents( $this->options['cache_base'] . 'url-webp-cache-' . $this->options['id'] . '.json' , 
-																							json_encode( $this->known_webp_urls ) );
-					
-					$this->counter_set( 'cache-webp-url' );
-				}
-				else
-				{
-					$this->known_img_urls[$original]	= $optimized;
-					
-					file_put_contents( $this->options['cache_base'] . 'url-img-cache' . $this->options['id'] . '.json' , 
-																							json_encode( $this->known_webp_urls ) );
-					
-					$this->counter_set( 'cache-img-url' );
-				}
-			}
-			
-			return $optimized;
-		}
-		
 		function url( $url )
 		{
 			if( ( $return_url = $this->cache_get( $url ) ) !== false )
@@ -349,21 +309,7 @@
 			
 			$original_url	= $url;
 			
-			#	Make relative URL absolute.
-			
-			$url	= $this->make_absolute_url( $url );
-			
-			//if( strpos( $url , '//' ) === 0 )		//Protocol relative
-			//{
-			//	$url = 'https:' . $url;
-			//}
-			//else if( strpos( $url , '/' ) === 0 )	//Origin relative
-			//{
-			//	if( strpos( $url , '/../' ) !== 0 )	//	/../ at the start would mean a URL outside the scope of CDN.
-			//	{
-			//		$url	= $this->options['origin'] . $url;
-			//	}
-			//}
+			$url			= $this->make_absolute_url( $url );
 			
 			if( ( strpos( $url , 'http://' ) === 0 ) || ( strpos( $url , 'https://' ) === 0 ) )
 			{
@@ -377,14 +323,14 @@
 						{
 							return $this->cache_set( $original_url , $return_url );
 						}
+					}
+					
+					if( !$this->is_full_origin_url( $original_url ) )
+					{
+						//Cache this so that URLs outside the origin path are no longer retried for public cdn.
+						//Still allow first attempt on public cdn, and then cache and return.
 						
-						if( !$this->is_full_origin_url( $original_url ) )
-						{
-							//Cache this so that URLs outside the origin path are no longer retried for public cdn.
-							//Still allow first attempt on public cdn, and then cache and return.
-							
-							return $this->cache_set( $original_url , $original_url );
-						}
+						return $this->cache_set( $original_url , $original_url );
 					}
 					
 					if( $this->is_origin_url( $url ) )
@@ -397,22 +343,6 @@
 						if( $this->options['private_cdn'] )
 						{
 							$this->check_repo( );
-							
-							//if( !$this->options['cdn_url'] )
-							//{
-							//	if( $this->options['apikey'] && $this->options['origin'] )
-							//	{
-							//		if( $ret = $this->create_repo( $data ) )
-							//		{
-							//			$this->options['cdn_url']	= $ret;
-							//		}
-							//	}
-							//}
-							//
-							//if( !$this->options['cdn_url'] )
-							//{
-							//	throw new Exception( 'PageCDN-Error: Private CDN could not be enabled.' );
-							//}
 							
 							$try_url	= $this->normalize_origin( $url );
 							
@@ -503,6 +433,8 @@
 				
 				$querystring		= '';
 				
+				$cache_identifier	= '';
+				
 				if( strpos( $url , '?' ) !== false )
 				{
 					$querystring	= substr( $url , strpos( $url , '?' ) + 1 );
@@ -524,12 +456,30 @@
 						$url	= substr( $url , 0 , -4 ) . $flag . substr( $url , -4 );
 						
 						$optimizable_image	= true;
+						
+						if( $this->options['webp_support'] )
+						{
+							$cache_identifier	= 'webp:';
+						}
+						else
+						{
+							$cache_identifier	= 'img:';
+						}
 					}
 					else if( in_array( strtolower( substr( $url , -5 ) ) , array( '.jpeg' ) ) )
 					{
 						$url	= substr( $url , 0 , -5 ) . $flag . substr( $url , -5 );
 						
 						$optimizable_image	= true;
+						
+						if( $this->options['webp_support'] )
+						{
+							$cache_identifier	= 'webp:';
+						}
+						else
+						{
+							$cache_identifier	= 'img:';
+						}
 					}
 				}
 				
@@ -538,6 +488,8 @@
 					if( ( substr( $url , -7 ) !== 'min.css' ) && ( substr( $url , -4 ) === '.css' ) )
 					{
 						$url	= substr_replace( $url , '.min.css' , strlen( $url ) - 4 , 4 );
+						
+						$cache_identifier	= 'min:';
 					}
 				}
 				
@@ -546,6 +498,8 @@
 					if( ( substr( $url , -6 ) !== 'min.js' ) && ( substr( $url , -3 ) === '.js' ) )
 					{
 						$url	= substr_replace( $url , '.min.js' , strlen( $url ) - 3 , 3 );
+						
+						$cache_identifier	= 'min:';
 					}
 				}
 				
@@ -556,17 +510,10 @@
 					$url	.= '?'.$querystring;
 				}
 				
-				if( $optimizable_image )
-				{
-					return $this->cache_set_image( $original_url , $url );
-				}
-				
-				return $this->cache_set( $original_url , $url );
+				return $this->cache_set( $cache_identifier . $original_url , $url );
 			}
 			
 			return $start_with;
-			
-			return $this->cache_set( $original_url , $start_with );
 		}
 		
 		private function is_origin_url( $url )
@@ -623,32 +570,6 @@
 			return in_array( $host , $public_hosts );
 		}
 		
-		/*
-		private function normalize_host( $url )
-		{
-			$origin_host = parse_url( $this->options['origin'] , PHP_URL_HOST );
-			
-			$url_host = parse_url( $url , PHP_URL_HOST );
-			
-			$origin_scheme = parse_url( $this->options['origin'] , PHP_URL_SCHEME );
-			
-			$url_scheme = parse_url( $url , PHP_URL_SCHEME );
-			
-			if( ( $origin_host !== $url_host ) || ( $origin_scheme !== $url_scheme ) )
-			{
-				foreach( $this->options['origin_equivalents'] as $opt )
-				{
-					if( ( strpos( $this->options['origin'] , $opt ) === 0 ) && ( strpos( $url , $opt ) !== 0 ) )
-					{
-						$url	= substr_replace( $url , $opt , 0 , strpos( $url , $url_host ) + strlen( $url_host ) );
-					}
-				}
-			}
-			
-			return $url;
-		}
-		*/
-		
 		private function normalize_origin( $url )
 		{
 			//Origin: http://example.com/
@@ -700,7 +621,6 @@
 			{
 				return $return_url;
 			}
-			
 			
 			if( !isset( $options['optimize'] ) )
 			{
@@ -812,7 +732,7 @@
 						
 						$try_url	= str_replace( $this->options['origin_url'] , $this->options['cdn_url'] , $try_url );
 						
-						return $this->cache_set_image(  $options['id'].':'.$original_url , $try_url );
+						return $this->cache_set(  $options['id'].':'.$original_url , $try_url );
 					}
 				}
 			}
@@ -1104,11 +1024,11 @@
 				if( isset( $this->known_urls[$url] ) )
 					unset( $this->known_urls[$url] );
 				
-				if( isset( $this->known_img_urls[$url] ) )
-					unset( $this->known_img_urls[$url] );
-				
-				if( isset( $this->known_webp_urls[$url] ) )
-					unset( $this->known_webp_urls[$url] );
+				//if( isset( $this->known_img_urls[$url] ) )
+				//	unset( $this->known_img_urls[$url] );
+				//
+				//if( isset( $this->known_webp_urls[$url] ) )
+				//	unset( $this->known_webp_urls[$url] );
 			}
 			
 			
@@ -1134,8 +1054,8 @@
 			if( $purge_local )
 			{
 				$this->known_urls		= array( );
-				$this->known_img_urls	= array( );
-				$this->known_webp_urls	= array( );
+				//$this->known_img_urls	= array( );
+				//$this->known_webp_urls	= array( );
 			}
 			
 			$args			= array( );
@@ -1156,41 +1076,6 @@
 			throw new Exception( $string );
 		}
 		
-		/*
-		private function api_get( $endpoint , $args )
-		{
-			$args		= http_build_query( array_merge( $args , $this->integration_info( ) ) );
-			
-			$response	= $this->request( "{$this->api_base}{$endpoint}?{$args}" );
-			
-			if( $response === false )
-			{
-				$this->error( 'PageCDN-Error: Unable to connect to API.' );
-				
-				return false;
-			}
-			
-			return json_decode( $response , true );
-		}
-		*/
-		
-		/*
-		private function api_post( $endpoint , $args )
-		{
-			$args		= array_merge( $args , $this->integration_info( ) );
-			
-			$response	= $this->request( "{$this->api_base}{$endpoint}" , 'post' , $args );
-			
-			if( $response === false )
-			{
-				$this->error( 'PageCDN-Error: Unable to connect to API.' );
-				
-				return false;
-			}
-			
-			return json_decode( $response , true );
-		}
-		*/
 		
 		private function integration_info( )
 		{
