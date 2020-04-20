@@ -271,10 +271,7 @@
 		{
 			if( isset( $this->known_urls[$url] ) )
 			{
-				if( !isset( $this->options['debug']['cache']['get'] ) )
-					$this->options['debug']['cache']['get']		= 0;
-				
-				$this->options['debug']['cache']['get']++;
+				$this->counter_get( 'cache-url' );
 				
 				return $this->known_urls[$url];
 			}
@@ -283,10 +280,7 @@
 			{
 				if( isset( $this->known_webp_urls[$url] ) )
 				{
-					if( !isset( $this->options['debug']['cache']['webp_get'] ) )
-						$this->options['debug']['cache']['webp_get']	= 0;
-					
-					$this->options['debug']['cache']['webp_get']++;
+					$this->counter_get( 'cache-webp-url' );
 					
 					return $this->known_webp_urls[$url];
 				}
@@ -295,10 +289,7 @@
 			{
 				if( isset( $this->known_img_urls[$url] ) )
 				{
-					if( !isset( $this->options['debug']['cache']['img_get'] ) )
-						$this->options['debug']['cache']['img_get']		= 0;
-					
-					$this->options['debug']['cache']['img_get']++;
+					$this->counter_get( 'cache-img-url' );
 					
 					return $this->known_img_urls[$url];
 				}
@@ -316,10 +307,7 @@
 				file_put_contents( $this->options['cache_base'] . 'url-cache-' . $this->options['id'] . '.json' , 
 																								json_encode( $this->known_urls ) );
 				
-				if( !isset( $this->options['debug']['cache']['set'] ) )
-					$this->options['debug']['cache']['set']		= 0;
-				
-				$this->options['debug']['cache']['set']++;
+				$this->counter_set( 'cache-url' );
 			}
 			
 			return $optimized;
@@ -336,10 +324,7 @@
 					file_put_contents( $this->options['cache_base'] . 'url-webp-cache-' . $this->options['id'] . '.json' , 
 																							json_encode( $this->known_webp_urls ) );
 					
-					if( !isset( $this->options['debug']['cache']['webp_set'] ) )
-						$this->options['debug']['cache']['webp_set']	= 0;
-					
-					$this->options['debug']['cache']['webp_set']++;
+					$this->counter_set( 'cache-webp-url' );
 				}
 				else
 				{
@@ -348,10 +333,7 @@
 					file_put_contents( $this->options['cache_base'] . 'url-img-cache' . $this->options['id'] . '.json' , 
 																							json_encode( $this->known_webp_urls ) );
 					
-					if( !isset( $this->options['debug']['cache']['img_set'] ) )
-						$this->options['debug']['cache']['img_set']		= 0;
-					
-					$this->options['debug']['cache']['img_set']++;
+					$this->counter_set( 'cache-img-url' );
 				}
 			}
 			
@@ -466,13 +448,13 @@
 				return $url;
 			}
 			
-			$contents	= $this->request( $url );
+			$contents	= $this->request( $url , 'get' , array( ) , $cacheable = true );
 			
 			if( $contents !== false )
 			{
 				$contents_hash	= hash( 'sha256' , $contents );
 				
-				$response	= $this->request( "https://pagecdn.io/lookup/{$contents_hash}" );
+				$response	= $this->request( "https://pagecdn.io/lookup/{$contents_hash}" , 'get' , array( ) , $cacheable = true );
 				
 				if( $response !== false )
 				{
@@ -731,6 +713,13 @@
 					$options['optimize']	= $this->options['optimize_images'];
 				}
 			}
+			else if( $options['optimize'] === false )
+			{
+				if( isset( $options['webp'] ) || isset( $options['width'] ) || isset( $options['height'] ) )
+				{
+					$options['optimize']	= true;
+				}
+			}
 			
 			
 			if( !isset( $options['width'] ) )
@@ -938,11 +927,11 @@
 			$repo_details	= array( );
 			
 			$key_options	= array(	$post['origin']				, 
-											$post['origin_url']			, 
-											$post['privacy']			, 
-											$post['cache_buster']		, 
-											$post['update_css_paths']	, 
-											$post['import_dir'] );
+										$post['origin_url']			, 
+										$post['privacy']			, 
+										$post['cache_buster']		, 
+										$post['update_css_paths']	, 
+										$post['import_dir'] );
 			
 			if( $use_existing_repo )
 			{
@@ -1030,10 +1019,7 @@
 					
 					$repo_details	= json_decode( $json , true );
 					
-					if( !isset( $this->options['debug']['repo-details']['get'] ) )
-						$this->options['debug']['repo-details']['get']		= 0;
-					
-					$this->options['debug']['repo-details']['get']++;
+					$this->counter_get( 'repo-details' );
 				}
 			}
 			
@@ -1048,13 +1034,26 @@
 				
 				file_put_contents( $cache_file , json_encode( $repo_details ) );
 				
-				if( !isset( $this->options['debug']['repo-details']['set'] ) )
-					$this->options['debug']['repo-details']['set']		= 0;
-				
-				$this->options['debug']['repo-details']['set']++;
+				$this->counter_set( 'repo-details' );
 			}
 			
 			return $repo_details;
+		}
+		
+		private function counter_set( $type )
+		{
+			if( !isset( $this->options['debug'][$type]['set'] ) )
+				$this->options['debug'][$type]['set']	= 0;
+			
+			$this->options['debug'][$type]['set']++;
+		}
+		
+		private function counter_get( $type )
+		{
+			if( !isset( $this->options['debug'][$type]['get'] ) )
+				$this->options['debug'][$type]['get']	= 0;
+			
+			$this->options['debug'][$type]['get']++;
 		}
 		
 		
@@ -1067,6 +1066,38 @@
 			
 			//TODO:
 			//Normalize URL
+			
+			$url	= $this->normalize_origin( $url );
+			
+			$origin_host	= parse_url( $this->options['origin_url'] , PHP_URL_HOST );
+			
+			$url_host		= parse_url( $url , PHP_URL_HOST );
+			
+			$origin_scheme	= parse_url( $this->options['origin_url'] , PHP_URL_SCHEME );
+			
+			$url_scheme		= parse_url( $url , PHP_URL_SCHEME );
+			
+			if( ( $origin_host !== $url_host ) || ( $origin_scheme !== $url_scheme ) )
+			{
+				foreach( $this->options['origin_equivalents'] as $opt )
+				{
+					if( ( strpos( $this->options['origin_url'] , $opt ) === 0 ) && ( strpos( $url , $opt ) !== 0 ) )
+					{
+						$url	= substr_replace( $url , $opt , 0 , strpos( $url , $url_host ) + strlen( $url_host ) );
+					}
+				}
+			}
+			
+			return $url;
+			
+			
+			
+			
+			
+			
+			
+			
+			
 			
 			if( $purge_local )
 			{
@@ -1113,9 +1144,7 @@
 			
 			$args['apikey']	= $this->options['apikey'];
 			
-			$args			= http_build_query( $args );
-			
-			$this->api_get( '/private/repo/delete-files?'.$args );
+			$this->api_request( '/private/repo/delete-files' , 'get' , $args );
 		}
 		
 		
@@ -1127,6 +1156,7 @@
 			throw new Exception( $string );
 		}
 		
+		/*
 		private function api_get( $endpoint , $args )
 		{
 			$args		= http_build_query( array_merge( $args , $this->integration_info( ) ) );
@@ -1142,7 +1172,9 @@
 			
 			return json_decode( $response , true );
 		}
+		*/
 		
+		/*
 		private function api_post( $endpoint , $args )
 		{
 			$args		= array_merge( $args , $this->integration_info( ) );
@@ -1158,6 +1190,7 @@
 			
 			return json_decode( $response , true );
 		}
+		*/
 		
 		private function integration_info( )
 		{
@@ -1169,7 +1202,8 @@
 			return $tool;
 		}
 		
-		function api_request( $endpoint , $method = 'get' , $fields = array( ) )
+		
+		function api_request( $endpoint , $method = 'get' , $fields = array( ) , $cache = false )
 		{
 			if( !isset( $fields['apikey'] ) )
 			{
@@ -1180,11 +1214,11 @@
 			{
 				$fields		= http_build_query( array_merge( $fields , $this->integration_info( ) ) );
 				
-				$response	= $this->request( "{$this->api_base}{$endpoint}?{$fields}" , $method );
+				$response	= $this->request( "{$this->api_base}{$endpoint}?{$fields}" , $method , array( ) , $cache );
 			}
 			else
 			{
-				$response	= $this->request( "{$this->api_base}{$endpoint}" , $method , $fields );
+				$response	= $this->request( "{$this->api_base}{$endpoint}" , $method , $fields , $cache );
 			}
 			
 			if( $response === false )
@@ -1204,8 +1238,21 @@
 			return $response['response'];
 		}
 		
-		private function request( $url , $method = 'get' , $fields = array( ) )
+		
+		private function request( $url , $method = 'get' , $fields = array( ) , $cache = false )
 		{
+			if( $cache )
+			{
+				$id	= md5( $url . $method . json_encode( $fields ) );
+				
+				$file_path	= $this->options['cache_dir'] . '/request-cache-' . $id . '.dat';
+				
+				if( file_exists( $file_path ) )
+				{
+					return file_get_contents( $file_path );
+				}
+			}
+			
 			$useragent	= 'Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:62.0) Gecko/20100101 Firefox/62.0';
 			
 			$curl		= curl_init();
@@ -1250,6 +1297,11 @@
 			}
 			
 			curl_close( $curl );
+			
+			if( $cache )
+			{
+				file_put_contents( $file_path , $response );
+			}
 			
 			return $response;
 		}
