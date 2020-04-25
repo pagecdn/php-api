@@ -35,7 +35,7 @@
 				
 				if( !isset( $options['optimize_images'] ) )
 				{
-					$options['optimize_images']	= true;
+					$options['optimize_images']	= false;
 				}
 				
 				if( !isset( $options['minify_css'] ) )
@@ -60,7 +60,7 @@
 				
 				if( !( isset( $options['origin_url'] ) && strlen( trim( $options['origin_url'] ) ) ) )
 				{
-					$options['origin_url']		= '';
+					self::error( 'Origin URL is required.' );
 				}
 				
 				if( $options['origin_url'] )
@@ -80,78 +80,6 @@
 					if( !parse_url( $options['origin_url'] , PHP_URL_SCHEME ) )
 					{
 						$options['origin_url']	= 'http://' . $options['origin_url'];
-					}
-				}
-				
-				if( !( isset( $options['cdn_name'] ) && strlen( trim( $options['cdn_name'] ) ) ) )
-				{
-					$options['cdn_name']		= '';
-					
-					if( $options['origin_url'] )
-					{
-						$options['cdn_name']	= trim( parse_url( $options['origin_url'] , PHP_URL_HOST ) , '/' );
-						
-						$_path	= trim( parse_url( $options['origin_url'] , PHP_URL_PATH ) , '/' );
-						
-						if( strlen( $_path ) )
-						{
-							$options['cdn_name']	.= '/' . $_path;
-						}
-					}
-				}
-				
-				if( !( isset( $options['apikey'] ) && strlen( trim( $options['apikey'] ) ) ) )
-				{
-					$options['apikey']		= '';
-				}
-				
-				if( !( isset( $options['cdn_url'] ) && $options['cdn_url'] ) )
-				{
-					$options['cdn_url']		= '';
-				}
-				
-				if( !isset( $options['private_cdn'] ) )
-				{
-					$options['private_cdn']	= true;
-				}
-				
-				
-				//It is possible to provide just cdn_url and omit apikey.
-				//It is also possible to provide just apikey and omit cdn_url.
-				//Omitting API key will disable purge and similar operations.
-				
-				if( !( $options['cdn_url'] || $options['apikey'] ) )
-				{
-					$options['private_cdn']	= false;
-				}
-				
-				if( !isset( $options['cache_dir'] ) )
-				{
-					$options['cache_dir']	= false;
-				}
-				
-				if( $options['cache_dir'] !== false )
-				{
-					if( !file_exists( $options['cache_dir'] ) )
-					{
-						if( !self::create_fs_hierarchy( $options['cache_dir'] ) )
-						{
-							$options['cache_dir']	= false;
-						}
-					}
-					else if( !is_writeable( $options['cache_dir'] ) )
-					{
-						$options['cache_dir']	= false;
-					}
-				}
-				
-				if( $options['cache_dir'] !== false )
-				{
-					$options['cache_dir']	= rtrim( $options['cache_dir'] , '/' );
-					
-					if( !file_exists( $options['cache_dir'] . '/url-cache-' . $options['id'] . '.json' ) )
-					{
-						file_put_contents( $options['cache_dir'] . '/url-cache-' . $options['id'] . '.json' , json_encode( array( ) ) );
 					}
 				}
 				
@@ -185,6 +113,77 @@
 															"http://www.{$_host}"	, "http://{$_host}"		,
 															"//www.{$_host}"		, "//{$_host}"			);
 				
+				if( !isset( $options['private_cdn'] ) )
+				{
+					$options['private_cdn']	= false;
+				}
+				
+				if( $options['private_cdn'] )
+				{
+					if( !( isset( $options['cdn_name'] ) && strlen( trim( $options['cdn_name'] ) ) ) )
+					{
+						$options['cdn_name']		= '';
+						
+						if( $options['origin_url'] )
+						{
+							$options['cdn_name']	= trim( parse_url( $options['origin_url'] , PHP_URL_HOST ) , '/' );
+							
+							$_path	= trim( parse_url( $options['origin_url'] , PHP_URL_PATH ) , '/' );
+							
+							if( strlen( $_path ) )
+							{
+								$options['cdn_name']	.= '/' . $_path;
+							}
+						}
+					}
+					
+					if( !( isset( $options['apikey'] ) && strlen( trim( $options['apikey'] ) ) ) )
+					{
+						$options['apikey']		= '';
+					}
+					
+					if( !( isset( $options['cdn_url'] ) && $options['cdn_url'] ) )
+					{
+						$options['cdn_url']		= '';
+					}
+					
+					if( !( $options['cdn_url'] || $options['apikey'] ) )
+					{
+						self::error( 'API Key or CDN URL is required to enable private CDN features.' );
+					}
+				}
+				
+				
+				#	It is possible to:
+				#	- provide just cdn_url and omit apikey, or
+				#	- provide just apikey and omit cdn_url.
+				#	
+				#	Omitting API key will disable operations that require API Key.
+				
+				
+				if( !isset( $options['cache_dir'] ) || ( $options['cache_dir'] == '' ) )
+				{
+					$options['cache_dir']	= __DIR__ . DIRECTORY_SEPARATOR . '.pagecdn-cache';
+				}
+				
+				if( !file_exists( $options['cache_dir'] ) )
+				{
+					if( !self::create_fs_hierarchy( $options['cache_dir'] ) )
+					{
+						self::error( 'Cache directory ' . $options['cache_dir'] . ' does not exist.' );
+					}
+				}
+				else if( !is_writeable( $options['cache_dir'] ) )
+				{
+					self::error( 'Cache directory ' . $options['cache_dir'] . ' is not writeable.' );
+				}
+				
+				$options['cache_dir']	= rtrim( $options['cache_dir'] , '/\\' ) . DIRECTORY_SEPARATOR;
+				
+				if( !file_exists( "{$options['cache_dir']}url-cache-{$options['id']}.json" ) )
+				{
+					file_put_contents( "{$options['cache_dir']}url-cache-{$options['id']}.json" , json_encode( array( ) ) );
+				}
 				
 				$options['webp_support']	= isset( $_SERVER['HTTP_ACCEPT'] ) && ( strpos( $_SERVER['HTTP_ACCEPT'] , 'image/webp' ) !== false );
 				
@@ -196,21 +195,21 @@
 		
 		function __construct( $options )
 		{
-			if( $options['cache_dir'] )
+			if( $this->known_urls = file_get_contents( "{$options['cache_dir']}url-cache-{$options['id']}.json" ) )
 			{
-				$options['cache_base']	= $options['cache_dir'] . '/';
-				
-				if( $this->known_urls = file_get_contents( $options['cache_base'] . 'url-cache-' . $options['id'] . '.json' ) )
-				{
-					$this->known_urls	= json_decode( $this->known_urls , true );
-				}
-				else
-				{
-					$this->known_urls	= array( );
-				}
+				$this->known_urls	= json_decode( $this->known_urls , true );
+			}
+			else
+			{
+				$this->known_urls	= array( );
 			}
 			
 			$this->options	= $options;
+			
+			if( !$this->options['cdn_url'] )
+			{
+				$this->check_repo( );
+			}
 		}
 		
 		private static function create_fs_hierarchy( $dir )
@@ -287,15 +286,11 @@
 		
 		private function cache_set( $original , $optimized )
 		{
-			if( $this->options['cache_dir'] )
-			{
-				$this->known_urls[$original] = $optimized;
-				
-				file_put_contents( $this->options['cache_base'] . 'url-cache-' . $this->options['id'] . '.json' , 
-																								json_encode( $this->known_urls ) );
-				
-				$this->counter_set( 'cache-url' );
-			}
+			$this->known_urls[$original] = $optimized;
+			
+			file_put_contents( "{$this->options['cache_dir']}url-cache-{$this->options['id']}.json" , json_encode( $this->known_urls ) );
+			
+			$this->counter_set( 'cache-url' );
 			
 			return $optimized;
 		}
@@ -315,7 +310,7 @@
 			{
 				if( $this->is_public_url( $url ) || $this->is_origin_url( $url ) )
 				{
-					if( $this->options['public_cdn'] && $this->options['cache_dir'] )
+					if( $this->options['public_cdn'] )
 					{
 						$return_url	= $this->lookup_public_file( $url );
 						
@@ -429,8 +424,6 @@
 			
 			if( $this->is_full_origin_url( $url ) )
 			{
-				$optimizable_image	= false;
-				
 				$querystring		= '';
 				
 				$cache_identifier	= '';
@@ -455,8 +448,6 @@
 					{
 						$url	= substr( $url , 0 , -4 ) . $flag . substr( $url , -4 );
 						
-						$optimizable_image	= true;
-						
 						if( $this->options['webp_support'] )
 						{
 							$cache_identifier	= 'webp:';
@@ -469,8 +460,6 @@
 					else if( in_array( strtolower( substr( $url , -5 ) ) , array( '.jpeg' ) ) )
 					{
 						$url	= substr( $url , 0 , -5 ) . $flag . substr( $url , -5 );
-						
-						$optimizable_image	= true;
 						
 						if( $this->options['webp_support'] )
 						{
@@ -663,7 +652,6 @@
 			#	Make relative URL absolute.
 			
 			$url	= $this->make_absolute_url( $url );
-			
 			
 			if( ( strpos( $url , 'http://' ) === 0 ) || ( strpos( $url , 'https://' ) === 0 ) )
 			{
@@ -924,23 +912,19 @@
 			return $repo_details;
 		}
 		
-		
 		private function cache_get_repo( $options )
 		{
 			$repo_details	= array( );
 			
-			if( $this->options['cache_dir'] )
+			$cache_file		= $this->options['cache_dir'] . 'cdn-cache-' . md5( json_encode( $options ) ) . '.json';
+			
+			if( file_exists( $cache_file ) )
 			{
-				$cache_file		= $this->options['cache_dir'] . '/cdn-details-' . md5( json_encode( $options ) ) . '.json';
+				$json	= file_get_contents( $cache_file );
 				
-				if( file_exists( $cache_file ) )
-				{
-					$json	= file_get_contents( $cache_file );
-					
-					$repo_details	= json_decode( $json , true );
-					
-					$this->counter_get( 'repo-details' );
-				}
+				$repo_details	= json_decode( $json , true );
+				
+				$this->counter_get( 'repo-details' );
 			}
 			
 			return $repo_details;
@@ -948,14 +932,11 @@
 		
 		private function cache_set_repo( $options , $repo_details )
 		{
-			if( $this->options['cache_dir'] )
-			{
-				$cache_file		= $this->options['cache_dir'] . '/cdn-details-' . md5( json_encode( $options ) ) . '.json';
-				
-				file_put_contents( $cache_file , json_encode( $repo_details ) );
-				
-				$this->counter_set( 'repo-details' );
-			}
+			$cache_file		= $this->options['cache_dir'] . 'cdn-cache-' . md5( json_encode( $options ) ) . '.json';
+			
+			file_put_contents( $cache_file , json_encode( $repo_details ) );
+			
+			$this->counter_set( 'repo-details' );
 			
 			return $repo_details;
 		}
@@ -976,72 +957,53 @@
 			$this->options['debug'][$type]['get']++;
 		}
 		
+		function reset_cache( )
+		{
+			foreach( glob( $this->options['cache_dir'] . '{request-cache,url-cache,cdn-cache}*' ,  GLOB_BRACE ) as $file )
+			{
+				if( !is_dir( $file ) )
+				{
+					unlink( $file );
+				}
+			}
+		}
 		
-		function purge( $url = null , $purge_local = false )
+		function purge( $url = null )
 		{
 			if( !( strlen( $this->options['apikey'] ) && strlen( $this->options['cdn_url'] ) ) )
 			{
-				return;
+				return false;
 			}
 			
-			//TODO:
-			//Normalize URL
+			$original_url	= $url;
 			
-			$url	= $this->normalize_origin( $url );
-			
-			$origin_host	= parse_url( $this->options['origin_url'] , PHP_URL_HOST );
-			
-			$url_host		= parse_url( $url , PHP_URL_HOST );
-			
-			$origin_scheme	= parse_url( $this->options['origin_url'] , PHP_URL_SCHEME );
-			
-			$url_scheme		= parse_url( $url , PHP_URL_SCHEME );
-			
-			if( ( $origin_host !== $url_host ) || ( $origin_scheme !== $url_scheme ) )
+			if( strpos( $url , 'https://pagecdn.io' ) === 0 )
 			{
-				foreach( $this->options['origin_equivalents'] as $opt )
+				if( !( strpos( $url , $this->options['cdn_url'] ) === 0 ) )
 				{
-					if( ( strpos( $this->options['origin_url'] , $opt ) === 0 ) && ( strpos( $url , $opt ) !== 0 ) )
-					{
-						$url	= substr_replace( $url , $opt , 0 , strpos( $url , $url_host ) + strlen( $url_host ) );
-					}
+					//Public Resources, or 3rd party resources cannot be purged using this method.
+					
+					return false;
+				}
+			}
+			else
+			{
+				$url	= $this->url( $url );
+				
+				if( !( strpos( $url , $this->options['cdn_url'] ) === 0 ) )
+				{
+					//Not a valid URL
+					
+					return false;
 				}
 			}
 			
-			return $url;
-			
-			
-			
-			
-			
-			
-			
-			
-			
-			
-			if( $purge_local )
+			if( isset( $this->known_urls[$original_url] ) )
 			{
-				if( isset( $this->known_urls[$url] ) )
-					unset( $this->known_urls[$url] );
-				
-				//if( isset( $this->known_img_urls[$url] ) )
-				//	unset( $this->known_img_urls[$url] );
-				//
-				//if( isset( $this->known_webp_urls[$url] ) )
-				//	unset( $this->known_webp_urls[$url] );
+				unset( $this->known_urls[$original_url] );
 			}
 			
-			
-			$args			= array( );
-			
-			$args['repo']	= trim( parse_url( $this->options['cdn_url'] , PHP_URL_PATH ) , '/' );
-			
-			$args['apikey']	= $this->options['apikey'];
-			
-			#TODO:
-			//Add to-be-purged URL to the querystring 
-			
-			$this->api_request( '/private/file/delete' , 'get' , $args );
+			$this->api_request( '/private/file/delete' , 'get' , array( 'file_url' => $url ) );
 		}
 		
 		function purge_all( $purge_local = false )
@@ -1051,31 +1013,19 @@
 				return;
 			}
 			
-			if( $purge_local )
-			{
-				$this->known_urls		= array( );
-				//$this->known_img_urls	= array( );
-				//$this->known_webp_urls	= array( );
-			}
+			$this->reset_cache( );
 			
 			$args			= array( );
 			
 			$args['repo']	= trim( parse_url( $this->options['cdn_url'] , PHP_URL_PATH ) , '/' );
 			
-			$args['apikey']	= $this->options['apikey'];
-			
 			$this->api_request( '/private/repo/delete-files' , 'get' , $args );
 		}
 		
-		
-		
-		
-		
-		private function error( $string )
+		private static function error( $string )
 		{
 			throw new Exception( $string );
 		}
-		
 		
 		private function integration_info( )
 		{
@@ -1086,7 +1036,6 @@
 			
 			return $tool;
 		}
-		
 		
 		function api_request( $endpoint , $method = 'get' , $fields = array( ) , $cache = false )
 		{
@@ -1123,14 +1072,13 @@
 			return $response['response'];
 		}
 		
-		
 		private function request( $url , $method = 'get' , $fields = array( ) , $cache = false )
 		{
 			if( $cache )
 			{
 				$id	= md5( $url . $method . json_encode( $fields ) );
 				
-				$file_path	= $this->options['cache_dir'] . '/request-cache-' . $id . '.dat';
+				$file_path	= $this->options['cache_dir'] . 'request-cache-' . $id . '.dat';
 				
 				if( file_exists( $file_path ) )
 				{
@@ -1193,30 +1141,3 @@
 	}
 	
 	
-	/*
-		/public/lookup
-		/public/files
-		/public/repos
-		
-		/private/account/info
-		/private/account/repos
-		
-		/private/file/delete
-		/private/file/lookup
-		/private/file/purge
-		
-		/private/version/delete
-		/private/version/files
-		/private/version/purge
-		
-		/private/repo/configure
-		/private/repo/create
-		/private/repo/delete
-		/private/repo/delete-files
-		/private/repo/files
-		/private/repo/info
-		/private/repo/purge
-		/private/repo/sync
-		/private/repo/upload
-		
-	*/
