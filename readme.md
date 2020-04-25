@@ -10,11 +10,12 @@ PHP Library for PageCDN API
 4. Write access to cache directory
 
 ### Usage
-i [Initial Setup](#initial-setup)
-i [Using Public CDN](#using-public-cdn)
-i [Using Private CDN](#using-private-cdn)
-i [Using Public + Private CDN](#using-public--private-cdn)
-i [Enabling Optimizations](#enabling-optimizations)
+1. [Initial Setup](#initial-setup)
+2. [Using Public CDN](#using-public-cdn)
+3. [Using Private CDN](#using-private-cdn)
+4. [Using Public + Private CDN](#using-public--private-cdn)
+5. [Enabling Optimizations](#enabling-optimizations)
+6. [Resizing, Converting and Optimizing Images](#resizing-converting-and-optimizing-images)
 
 ### Initial Setup
 
@@ -38,7 +39,7 @@ $pagecdn = PageCDN::init( $options );
 ```
 
 ### Using Public CDN
-PageCDN offers both Public CDN and Private CDN. Using Public CDN is free and DOES NOT even require a free account. Here is how you can link to a resource automatically from Public CDN.
+PageCDN offers both Public CDN and Private CDN. Using Public CDN is **FREE** and DOES NOT even require an account. Here is how you can link to a resource automatically from Public CDN.
 ```php
 <?php
 require 'pagecdn.php';
@@ -53,20 +54,94 @@ $pagecdn = PageCDN::init( $options );
 echo $pagecdn->url('https://stackpath.bootstrapcdn.com/bootstrap/4.3.1/css/bootstrap.css?ver=4.3.1');
 echo $pagecdn->url('https://your-website.com/blog/wp-includes/js/jquery/jquery.js');
 
-
-#Result:
-#https://pagecdn.io/lib/bootstrap/4.3.1/css/bootstrap.min.css
-#https://pagecdn.io/repo/wp-includes/5.4/js/jquery/jquery.js
-
+# Result:
+#   https://pagecdn.io/lib/bootstrap/4.3.1/css/bootstrap.min.css
+#   https://pagecdn.io/repo/wp-includes/5.4/js/jquery/jquery.js
 ```
 
-
-
-
 ### Using Private CDN
-### Using Public + Private CDN
-### Enabling Optimizations
+Using Private CDN requires API Key and optionally CDN URL in addition to the basic requirements set forth in the Initial Setup section above. This library can automatically create a private repo (Zone) for you to ease the CDN connection. Here is example of a basic Private CDN setup.
+```php
+<?php
+require 'pagecdn.php';
 
+$options = [ 'private_cdn'=> true ,
+             'origin_url' => 'https://your-website.com/blog' , //Always Required
+             'apikey'     => '3e692034d5b4d31326f8dc637229ee6f95a50e1242394420f07a8597934c0cc0' , //Required for Private CDN
+             'cdn_url'    => 'https://pagecdn.io/site/abcxyz' , //Optional. Library can automatically find or create a CDN_URL for you
+             'cache_dir'  => './sdk-cache/'                    //Always required
+             ];
+
+$pagecdn = PageCDN::init( $options );
+
+echo $pagecdn->url('https://your-website.com/blog/assets/hello.css');
+
+# Result:
+#   https://pagecdn.io/site/abcxyz/assets/hello.css
+```
+
+### Using Public + Private CDN
+It is possible to use Public and Private CDN together. In such a case, this library will automatically find the most optimal way to link to a resource.
+```php
+<?php
+require 'pagecdn.php';
+
+$options = [ 'private_cdn'=> true ,
+             'public_cdn' => true ,
+             'origin_url' => 'https://your-website.com/blog' , //Always Required
+             'apikey'     => '3e692034d5b4d31326f8dc637229ee6f95a50e1242394420f07a8597934c0cc0' , //Required for Private CDN
+             'cdn_url'    => 'https://pagecdn.io/site/abcxyz' , //Optional. Library can automatically find or create a CDN_URL for you
+             'cache_dir'  => './sdk-cache/'                    //Always required
+             ];
+
+$pagecdn = PageCDN::init( $options );
+
+echo $pagecdn->url('https://your-website.com/blog/assets/hello.css');
+echo $pagecdn->url('https://stackpath.bootstrapcdn.com/bootstrap/4.3.1/css/bootstrap.css?ver=4.3.1');
+echo $pagecdn->url('https://your-website.com/blog/wp-includes/js/jquery/jquery.js');
+
+# Result:
+#   https://pagecdn.io/site/abcxyz/assets/hello.css               [Private CDN]
+#   https://pagecdn.io/lib/bootstrap/4.3.1/css/bootstrap.min.css  [Public CDN]
+#   https://pagecdn.io/repo/wp-includes/5.4/js/jquery/jquery.js   [Public CDN]
+```
+Linking to resources from Public CDN is recommended as it increases cache hit ratio in browser and on edge. Using Public CDN is free, and results in bandwidth cost saving.
+
+### Enabling Optimizations
+All the above examples help with loading resources over CDN. But this is not all what PageCDN can do for you. PageCDN allows you to optimiize your website resources aggressively without worrying about maintaining complex optimization tools, configurations and optimized files.
+Optimizing resources with PageCDN is as simple as just linking to a resource.
+```php
+<?php
+require 'pagecdn.php';
+
+$options = [ 'private_cdn'=> true ,
+             'public_cdn' => true ,
+             'origin_url' => 'https://your-website.com/blog' , //Always Required
+             'apikey'     => '3e692034d5b4d31326f8dc637229ee6f95a50e1242394420f07a8597934c0cc0' , //Required for Private CDN
+             'cdn_url'    => 'https://pagecdn.io/site/abcxyz' , //Optional. Library can automatically find or create a CDN_URL for you
+             'cache_dir'  => './sdk-cache/'                   , //Always required
+             
+             //Optimizations
+             'remove_querystring'	=> true ,
+             'optimize_images'    => true ,
+             'minify_css'         => true ,
+             'minify_js'          => true ,
+             ];
+
+$pagecdn = PageCDN::init( $options );
+
+echo $pagecdn->url('https://your-website.com/blog/assets/hello.js?ver=4.2.1');
+echo $pagecdn->url('https://stackpath.bootstrapcdn.com/bootstrap/4.3.1/css/bootstrap.css?ver=4.3.1');
+echo $pagecdn->url('https://your-website.com/blog/assets/company-logo.png');
+
+# Result:
+#   https://pagecdn.io/site/abcxyz/assets/hello.min.js              [Minified JS on Private CDN, Removed Querystring]
+#   https://pagecdn.io/lib/bootstrap/4.3.1/css/bootstrap.min.css    [Minified CSS on Public CDN]
+#   https://pagecdn.io/site/abcxyz/assets/company-logo._o_webp.png  [Optimized and Converted to WebP if browser supports for WebP is available]
+```
+All these optimizations are handled by PageCDN on the fly.
+
+### Resizing, Converting and Optimizing Images
 
 
 
