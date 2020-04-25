@@ -108,7 +108,7 @@ echo $pagecdn->url('https://your-website.com/blog/wp-includes/js/jquery/jquery.j
 Linking to resources from Public CDN is recommended as it increases cache hit ratio in browser and on edge. Using Public CDN is free, and results in bandwidth cost saving.
 
 ### Enabling Optimizations
-All the above examples help with loading resources over CDN. But this is not all what PageCDN can do for you. PageCDN allows you to optimiize your website resources aggressively without worrying about maintaining complex optimization tools, configurations and optimized files.
+All the above examples help with loading resources over CDN. But this is not all what PageCDN can do for you. PageCDN allows you to optimize your website resources aggressively without worrying about maintaining complex optimization tools, configurations and multiple copies of optimized files.
 Optimizing resources with PageCDN is as simple as just linking to a resource.
 ```php
 <?php
@@ -142,7 +142,36 @@ echo $pagecdn->url('https://your-website.com/blog/assets/company-logo.png');
 All these optimizations are handled by PageCDN on the fly.
 
 ### Resizing, Converting and Optimizing Images
+Enabling above image optimization in itself can speedup website by a big margin. However, you may need to resize images to smaller dimensions to save unnecessary bandwidth spent on delivering large images. Here is how to achieve that.
+```php
+<?php
+require 'pagecdn.php';
 
+$options = [ 'private_cdn'=> true ,
+             'public_cdn' => true ,
+             'origin_url' => 'https://your-website.com/blog' , //Always Required
+             'apikey'     => '3e692034d5b4d31326f8dc637229ee6f95a50e1242394420f07a8597934c0cc0' , //Required for Private CDN
+             'cdn_url'    => 'https://pagecdn.io/site/abcxyz' , //Optional. Library can automatically find or create a CDN_URL for you
+             'cache_dir'  => './sdk-cache/'                   , //Always required
+             
+             //Optimizations
+             'remove_querystring'	=> true ,
+             'optimize_images'    => true ,
+             'minify_css'         => true ,
+             'minify_js'          => true ,
+             ];
 
+$pagecdn = PageCDN::init( $options );
 
+echo $pagecdn->image('https://your-website.com/blog/assets/company-logo.png',['width'=>300,'height'=>100]);
 
+# Result:
+#   https://pagecdn.io/site/abcxyz/assets/company-logo._o_300w_100h_webp.png
+```
+
+### Missing Features
+Some of the PageCDN features are not yet implemented in this library. Please wait for the future releases to avail those features, or roll your own implementation or library with the help of [API Docs](https://pagecdn.com/docs).
+1. In-URL Cache Busters
+2. Storage Buckets / Push CDN
+3. Pull CDN for Github Repos
+4. Autmatic conversion of Google Fonts or other Font URLs to [Easyfonts](https://pagecdn.com/lib/easyfonts).
