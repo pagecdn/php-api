@@ -1022,7 +1022,7 @@
 				return;
 			}
 			
-			$this->reset_cache( );
+			//$this->reset_cache( );
 			
 			$args			= array( );
 			
