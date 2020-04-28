@@ -604,13 +604,6 @@
 		
 		function image( $url , $options = array( ) )
 		{
-			$options['id']	= md5( json_encode( $options ) . $this->options['id'] );
-			
-			if( ( $return_url = $this->cache_get( $options['id'].':'.$url ) ) !== false )
-			{
-				return $return_url;
-			}
-			
 			if( !isset( $options['optimize'] ) )
 			{
 				if( isset( $options['webp'] ) || isset( $options['width'] ) || isset( $options['height'] ) )
@@ -643,8 +636,24 @@
 			
 			if( !isset( $options['webp'] ) )
 			{
-				$options['webp']	= true;
+				if( $this->options['webp_support'] )
+				{
+					$options['webp']	= true;
+				}
+				else
+				{
+					$options['webp']	= false;
+				}
 			}
+			
+			$options['id']	= md5( json_encode( $options ) . $this->options['id'] );
+			
+			if( ( $return_url = $this->cache_get( $options['id'].':'.$url ) ) !== false )
+			{
+				return $return_url;
+			}
+			
+			
 			
 			
 			$original_url	= $url;
