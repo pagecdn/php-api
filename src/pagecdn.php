@@ -1015,7 +1015,7 @@
 			$this->api_request( '/private/file/delete' , 'get' , array( 'file_url' => $url ) );
 		}
 		
-		function purge_all( $purge_local = false )
+		function purge_all( )
 		{
 			if( !( strlen( $this->options['apikey'] ) && strlen( $this->options['cdn_url'] ) ) )
 			{

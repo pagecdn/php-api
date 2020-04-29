@@ -16,6 +16,8 @@ PHP Library for PageCDN API
 4. [Using Public + Private CDN](#using-public--private-cdn)
 5. [Enabling Optimizations](#enabling-optimizations)
 6. [Resizing, Converting and Optimizing Images](#resizing-converting-and-optimizing-images)
+7. [Purge and Cache cleanup](#purge-and-cache-cleanup)
+8. [Basic API Calls](#basic-api-calls)
 
 ### Initial Setup
 
@@ -167,6 +169,30 @@ echo $pagecdn->image('https://your-website.com/blog/assets/company-logo.png',['w
 
 # Result:
 #   https://pagecdn.io/site/abcxyz/assets/company-logo._o_300w_100h_webp.png
+```
+### Purge and Cache cleanup
+#### Purge a single URL from PageCDN edge cache
+```php
+$pagecdn->purge('https://your-website.com/blog/assets/company-logo.png');
+```
+#### Purge the entire repo
+```php
+$pagecdn->purge_all( );
+```
+#### Reset local directory cache
+```php
+$pagecdn->reset_cache( );
+```
+
+### Basic API Calls
+The below method allows you to conveniently make API calls. For documentation of API endpoints, visit [docs](https://pagecdn.com/docs).
+```php
+$endpoint = '/private/account/repos';  //list all repos in my account
+$method   = 'get';
+$fields   = [];                        //no get or post fields required other than apikey
+$cache    = true;                      //cache response locally, can be removed with reset_cache( )
+
+$pagecdn->api_request( $endpoint , $method , $fields , $cache );
 ```
 
 ### Missing Features
